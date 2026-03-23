@@ -30,14 +30,8 @@ export function Card({ data, layout, themeName }: CardProps) {
         <clipPath id={avatarClipId}>
           <circle cx={String(avatar.cx)} cy={String(avatar.cy)} r={String(avatar.r)} />
         </clipPath>
-        <linearGradient id="glassLight" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="rgba(255,255,255,0.35)" />
-          <stop offset="100%" stop-color="rgba(255,255,255,0.02)" />
-        </linearGradient>
       </defs>
 
-      <rect x="0" y="0" width={String(size.width)} height={String(size.height)} fill="transparent" />
-      <rect x="0" y="0" width={String(size.width)} height={String(size.height)} fill="url(#glassLight)" />
       {layout === "compact" ? <CompactLayout data={data} theme={theme} /> : <DefaultLayout data={data} theme={theme} />}
     </svg>
   )
