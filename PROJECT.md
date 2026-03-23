@@ -21,6 +21,11 @@ npm run dev
 - `http://127.0.0.1:8787/card.svg`
 - `http://127.0.0.1:8787/card.svg?layout=compact&theme=dark`
 
+データ仕様:
+
+- Contribution ヒートマップ: 過去365日 (GraphQL)
+- Commits by Hour: 直近90日、`author=<username>`、自分所有 public repos (REST)
+
 ## Deploy
 
 ```bash

@@ -35,5 +35,6 @@ export type CardData = {
   languages: LanguageStat[]
   contributionHeatmap: HeatmapDay[]
   hourlyCommits: HourlyBucket[]
+  contributionWindowLabel: string
   windowLabel: string
 }

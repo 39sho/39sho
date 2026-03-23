@@ -27,16 +27,18 @@ export function Card({ data, layout, themeName }: CardProps) {
       aria-label="GitHub profile card"
     >
       <defs>
-        <linearGradient id="bgGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color={theme.backgroundTop} />
-          <stop offset="100%" stop-color={theme.backgroundBottom} />
-        </linearGradient>
         <clipPath id={avatarClipId}>
           <circle cx={String(avatar.cx)} cy={String(avatar.cy)} r={String(avatar.r)} />
         </clipPath>
+        <linearGradient id="glassLight" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="rgba(255,255,255,0.35)" />
+          <stop offset="100%" stop-color="rgba(255,255,255,0.02)" />
+        </linearGradient>
       </defs>
 
-      <rect x="0" y="0" width={String(size.width)} height={String(size.height)} fill="url(#bgGradient)" />
+      <rect x="0" y="0" width={String(size.width)} height={String(size.height)} fill="transparent" />
+      <circle cx={String(size.width - 84)} cy="76" r="48" fill="rgba(255,255,255,0.1)" />
+      <rect x="0" y="0" width={String(size.width)} height={String(size.height)} fill="url(#glassLight)" />
       {layout === "compact" ? <CompactLayout data={data} theme={theme} /> : <DefaultLayout data={data} theme={theme} />}
     </svg>
   )

@@ -1,6 +1,8 @@
 export const config = {
   github: {
-    username: "39sho"
+    username: "39sho",
+    excludeLanguages: [] as string[],
+    excludeForksFromLanguages: true
   },
   card: {
     sizes: {
@@ -21,10 +23,9 @@ export const config = {
   },
   themes: {
     light: {
-      backgroundTop: "#f2f6ff",
-      backgroundBottom: "#c7d8f8",
-      panel: "#fdfefe",
-      panelMuted: "#ebf1fc",
+      panel: "rgba(255, 255, 255, 0.58)",
+      panelMuted: "rgba(232, 240, 252, 0.78)",
+      frame: "rgba(133, 154, 186, 0.42)",
       text: "#132540",
       textMuted: "#556786",
       accent: "#ff8a00",
@@ -33,10 +34,9 @@ export const config = {
       heatmapLevels: ["#ecf1f8", "#d4f4dd", "#a7e8bc", "#65cd84", "#2f9e44"] as const
     },
     dark: {
-      backgroundTop: "#0d1321",
-      backgroundBottom: "#1b263b",
-      panel: "#101a2b",
-      panelMuted: "#1b2a43",
+      panel: "rgba(13, 17, 23, 0.42)",
+      panelMuted: "rgba(33, 46, 68, 0.72)",
+      frame: "rgba(111, 133, 165, 0.45)",
       text: "#e9efff",
       textMuted: "#9eb0cc",
       accent: "#ffb454",
@@ -49,7 +49,8 @@ export const config = {
     maxReposForStars: 120,
     maxReposForCommitHistogram: 30,
     maxCommitPagesPerRepo: 3,
-    contributionsDays: 365
+    contributionsDays: 365,
+    commitHistogramDays: 90
   },
   cache: {
     ttlSeconds: 1800

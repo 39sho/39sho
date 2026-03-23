@@ -22,6 +22,7 @@ type RepositoriesQueryData = {
     repositories: {
       nodes: Array<{
         name: string
+        isFork: boolean
         stargazerCount: number
         languages: {
           edges: Array<{
@@ -37,6 +38,7 @@ type RepositoriesQueryData = {
 
 type RepositoryNode = {
   name: string
+  isFork: boolean
   stargazerCount: number
   languages: {
     edges: Array<{
@@ -63,15 +65,6 @@ type ContributionsQueryData = {
           }>
         }>
       }
-      commitContributionsByRepository: Array<{
-        repository: {
-          isPrivate: boolean
-          owner: { login: string }
-        }
-        contributions: {
-          nodes: Array<{ occurredAt: string }>
-        }
-      }>
     }
   } | null
 }
@@ -105,6 +98,7 @@ query RepositoriesQuery($username: String!, $first: Int!, $after: String) {
     ) {
       nodes {
         name
+        isFork
         stargazerCount
         languages(first: 8, orderBy: { field: SIZE, direction: DESC }) {
           edges {
@@ -126,7 +120,7 @@ query RepositoriesQuery($username: String!, $first: Int!, $after: String) {
 `
 
 const CONTRIBUTIONS_QUERY = `
-query ContributionsQuery($username: String!, $from: DateTime!, $to: DateTime!, $maxRepositories: Int!) {
+query ContributionsQuery($username: String!, $from: DateTime!, $to: DateTime!) {
   user(login: $username) {
     contributionsCollection(from: $from, to: $to) {
       contributionCalendar {
@@ -135,19 +129,6 @@ query ContributionsQuery($username: String!, $from: DateTime!, $to: DateTime!, $
             date
             contributionCount
             contributionLevel
-          }
-        }
-      }
-      commitContributionsByRepository(maxRepositories: $maxRepositories) {
-        repository {
-          isPrivate
-          owner {
-            login
-          }
-        }
-        contributions(first: 100) {
-          nodes {
-            occurredAt
           }
         }
       }
@@ -179,6 +160,22 @@ async function githubGraphQL<T>(token: string, query: string, variables: Record<
     throw new Error("GitHub GraphQL returned empty data")
   }
   return payload.data
+}
+
+async function githubRest<T>(token: string, path: string): Promise<T> {
+  const response = await fetch(`https://api.github.com${path}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "profile-card-worker"
+    }
+  })
+
+  if (!response.ok) {
+    throw new Error(`GitHub REST request failed: ${response.status} (${path})`)
+  }
+
+  return (await response.json()) as T
 }
 
 async function avatarToDataUrl(avatarUrl: string): Promise<string> {
@@ -250,9 +247,17 @@ async function normalizeProfile(data: ProfileQueryData): Promise<ProfileData> {
 }
 
 function aggregateLanguages(repositories: RepositoryNode[]): LanguageStat[] {
+  const excluded = new Set(config.github.excludeLanguages.map((name) => name.toLowerCase()))
+  const excludeForks = config.github.excludeForksFromLanguages
   const languageMap = new Map<string, { size: number; color: string }>()
   for (const repository of repositories) {
+    if (excludeForks && repository.isFork) {
+      continue
+    }
     for (const edge of repository.languages.edges) {
+      if (excluded.has(edge.node.name.toLowerCase())) {
+        continue
+      }
       const existing = languageMap.get(edge.node.name)
       const color = edge.node.color ?? "#9aa4b2"
       if (!existing) {
@@ -279,21 +284,65 @@ function normalizeHeatmap(data: ContributionsQueryData): HeatmapDay[] {
   }))
 }
 
-function normalizeHourlyCommits(data: ContributionsQueryData, username: string, timeZone: string): HourlyBucket[] {
+async function normalizeHourlyCommits(token: string, username: string, timeZone: string, commitFromIso: string): Promise<HourlyBucket[]> {
   const buckets = new Array<number>(24).fill(0)
-  const repositories = data.user?.contributionsCollection.commitContributionsByRepository ?? []
 
-  for (const repositoryContribution of repositories) {
-    if (repositoryContribution.repository.isPrivate) {
-      continue
-    }
-    if (repositoryContribution.repository.owner.login.toLowerCase() !== username.toLowerCase()) {
-      continue
-    }
+  type RepoListItem = {
+    name: string
+    fork: boolean
+  }
 
-    for (const node of repositoryContribution.contributions.nodes) {
-      const hour = hourInTimezone(node.occurredAt, timeZone)
-      buckets[hour] += 1
+  type CommitListItem = {
+    commit: {
+      author: {
+        date: string
+      } | null
+    }
+  }
+
+  const repoCandidates: RepoListItem[] = []
+  let page = 1
+  while (repoCandidates.length < config.limits.maxReposForCommitHistogram) {
+    const reposPage = await githubRest<RepoListItem[]>(
+      token,
+      `/users/${username}/repos?type=owner&sort=updated&per_page=100&page=${page}`
+    )
+    if (!reposPage.length) {
+      break
+    }
+    repoCandidates.push(...reposPage)
+    if (reposPage.length < 100) {
+      break
+    }
+    page += 1
+  }
+
+  const targetRepos = repoCandidates
+    .filter((repo) => !(config.github.excludeForksFromLanguages && repo.fork))
+    .slice(0, config.limits.maxReposForCommitHistogram)
+
+  for (const repo of targetRepos) {
+    for (let commitPage = 1; commitPage <= config.limits.maxCommitPagesPerRepo; commitPage += 1) {
+      const commits = await githubRest<CommitListItem[]>(
+        token,
+        `/repos/${username}/${repo.name}/commits?since=${encodeURIComponent(commitFromIso)}&author=${encodeURIComponent(username)}&per_page=100&page=${commitPage}`
+      )
+      if (!commits.length) {
+        break
+      }
+
+      for (const item of commits) {
+        const authoredDate = item.commit.author?.date
+        if (!authoredDate) {
+          continue
+        }
+        const hour = hourInTimezone(authoredDate, timeZone)
+        buckets[hour] += 1
+      }
+
+      if (commits.length < 100) {
+        break
+      }
     }
   }
 
@@ -303,8 +352,10 @@ function normalizeHourlyCommits(data: ContributionsQueryData, username: string, 
 export async function fetchGitHubCardData(token: string): Promise<CardData> {
   const username = config.github.username
   const now = new Date()
-  const from = new Date(now)
-  from.setUTCDate(from.getUTCDate() - 90)
+  const contributionFrom = new Date(now)
+  contributionFrom.setUTCDate(contributionFrom.getUTCDate() - config.limits.contributionsDays)
+  const commitFrom = new Date(now)
+  commitFrom.setUTCDate(commitFrom.getUTCDate() - config.limits.commitHistogramDays)
 
   const profileData = await githubGraphQL<ProfileQueryData>(token, PROFILE_QUERY, {
     username
@@ -332,9 +383,8 @@ export async function fetchGitHubCardData(token: string): Promise<CardData> {
 
   const contributionsData = await githubGraphQL<ContributionsQueryData>(token, CONTRIBUTIONS_QUERY, {
     username,
-    from: from.toISOString(),
-    to: now.toISOString(),
-    maxRepositories: config.limits.maxReposForCommitHistogram
+    from: contributionFrom.toISOString(),
+    to: now.toISOString()
   })
 
   const totalStars = repositories.reduce((sum: number, repository: RepositoryNode) => sum + repository.stargazerCount, 0)
@@ -349,7 +399,8 @@ export async function fetchGitHubCardData(token: string): Promise<CardData> {
     },
     languages,
     contributionHeatmap: normalizeHeatmap(contributionsData),
-    hourlyCommits: normalizeHourlyCommits(contributionsData, username, config.card.timezone),
-    windowLabel: `Last 90 days (${config.card.timezone})`
+    hourlyCommits: await normalizeHourlyCommits(token, username, config.card.timezone, commitFrom.toISOString()),
+    contributionWindowLabel: `Last ${config.limits.contributionsDays} days`,
+    windowLabel: `Last ${config.limits.commitHistogramDays} days, own public repos (${config.card.timezone})`
   }
 }

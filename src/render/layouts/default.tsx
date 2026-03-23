@@ -14,11 +14,11 @@ type DefaultLayoutProps = {
 export function DefaultLayout({ data, theme }: DefaultLayoutProps) {
   return (
     <g>
-      <rect x="24" y="24" width="1152" height="672" rx="28" fill={theme.panel} />
+      <rect x="24" y="24" width="1152" height="672" rx="28" fill={theme.panel} stroke={theme.frame} stroke-width="1.4" />
       <g transform="translate(52 52)">
         <ProfileSection profile={data.profile} theme={theme} avatarClipId="avatarClipDefault" />
         <StatsSection stats={data.stats} x={500} y={20} theme={theme} />
-        <HeatmapSection days={data.contributionHeatmap} x={0} y={176} width={740} theme={theme} />
+        <HeatmapSection days={data.contributionHeatmap} x={0} y={176} width={740} theme={theme} title={data.contributionWindowLabel} />
         <LanguagesSection languages={data.languages} x={770} y={176} width={330} theme={theme} />
         <HourlyCommitsSection
           buckets={data.hourlyCommits}
