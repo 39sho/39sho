@@ -1,0 +1,6 @@
+name = "profile-card-worker"
+main = "src/index.tsx"
+compatibility_date = "2026-03-23"
+
+[observability]
+enabled = true
