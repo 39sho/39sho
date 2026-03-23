@@ -181,6 +181,29 @@ async function githubGraphQL<T>(token: string, query: string, variables: Record<
   return payload.data
 }
 
+async function avatarToDataUrl(avatarUrl: string): Promise<string> {
+  const response = await fetch(avatarUrl, {
+    headers: {
+      "User-Agent": "profile-card-worker"
+    }
+  })
+
+  if (!response.ok) {
+    return avatarUrl
+  }
+
+  const contentType = response.headers.get("content-type") ?? "image/png"
+  const bytes = await response.arrayBuffer()
+  let binary = ""
+  const chunk = 0x8000
+  const view = new Uint8Array(bytes)
+  for (let offset = 0; offset < view.length; offset += chunk) {
+    binary += String.fromCharCode(...view.subarray(offset, offset + chunk))
+  }
+  const base64 = btoa(binary)
+  return `data:${contentType};base64,${base64}`
+}
+
 function mapContributionLevel(level: ContributionLevel): 0 | 1 | 2 | 3 | 4 {
   switch (level) {
     case "FIRST_QUARTILE":
@@ -209,17 +232,19 @@ function hourInTimezone(iso: string, timeZone: string): number {
   return Number.isFinite(hour) && hour >= 0 && hour <= 23 ? hour : 0
 }
 
-function normalizeProfile(data: ProfileQueryData): ProfileData {
+async function normalizeProfile(data: ProfileQueryData): Promise<ProfileData> {
   const user = data.user
   if (!user) {
     throw new Error("GitHub user not found")
   }
 
+  const avatarDataUrl = await avatarToDataUrl(user.avatarUrl)
+
   return {
     login: user.login,
     name: user.name ?? user.login,
     bio: user.bio ?? "No bio yet.",
-    avatarUrl: user.avatarUrl,
+    avatarDataUrl,
     url: user.url
   }
 }
@@ -284,7 +309,7 @@ export async function fetchGitHubCardData(token: string): Promise<CardData> {
   const profileData = await githubGraphQL<ProfileQueryData>(token, PROFILE_QUERY, {
     username
   })
-  const profile = normalizeProfile(profileData)
+  const profile = await normalizeProfile(profileData)
 
   const repositories: RepositoryNode[] = []
   let cursor: string | null = null

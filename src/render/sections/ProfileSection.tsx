@@ -27,7 +27,7 @@ export function ProfileSection({ profile, theme, compact = false, avatarClipId =
     <g>
       <circle cx={avatarCx} cy={avatarCy} r={avatarR} fill={theme.panelMuted} />
       <image
-        href={profile.avatarUrl}
+        href={profile.avatarDataUrl}
         x={imageOffset}
         y={imageOffset}
         width={imageSize}

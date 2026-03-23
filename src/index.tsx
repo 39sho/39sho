@@ -28,7 +28,10 @@ app.get("/card.svg", async (c) => {
   }
 
   const layoutParam = c.req.query(config.card.layoutParam)
-  const layout: CardLayout = layoutParam === "compact" ? "compact" : "default"
+  const userAgent = c.req.header("user-agent") ?? ""
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|BlackBerry|Opera Mini|IEMobile/i.test(userAgent)
+  const layout: CardLayout =
+    layoutParam === "compact" ? "compact" : layoutParam === "default" ? "default" : isMobile ? "compact" : "default"
   const themeParam = c.req.query(config.card.themeParam)
   const themeName: CardThemeName = themeParam === "dark" ? "dark" : "light"
 

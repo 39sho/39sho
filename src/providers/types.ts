@@ -25,7 +25,7 @@ export type ProfileData = {
   login: string
   name: string
   bio: string
-  avatarUrl: string
+  avatarDataUrl: string
   url: string
 }
 
