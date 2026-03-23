@@ -37,7 +37,6 @@ export function Card({ data, layout, themeName }: CardProps) {
       </defs>
 
       <rect x="0" y="0" width={String(size.width)} height={String(size.height)} fill="transparent" />
-      <circle cx={String(size.width - 84)} cy="76" r="48" fill="rgba(255,255,255,0.1)" />
       <rect x="0" y="0" width={String(size.width)} height={String(size.height)} fill="url(#glassLight)" />
       {layout === "compact" ? <CompactLayout data={data} theme={theme} /> : <DefaultLayout data={data} theme={theme} />}
     </svg>
